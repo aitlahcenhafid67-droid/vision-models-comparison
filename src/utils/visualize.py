@@ -8,8 +8,7 @@ Chaque modèle produit un type de sortie différent :
 """
 
 import numpy as np
-import cv2
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter
 
 
 # Couleurs par classe : Bird=vert, Cat=bleu, Dog=rouge
@@ -134,19 +133,9 @@ def draw_sam_masks(image: Image.Image, masks: list, class_ids: list | None = Non
             img_array
         )
 
-        # Contour du masque
-        mask_uint8 = (mask * 255).astype(np.uint8)
-        contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(img_array, contours, -1, rgba_color[:3] + (255,), 2)
+        # Contour du masque avec PIL (sans cv2)
+        mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
+        edges = np.array(mask_pil.filter(ImageFilter.FIND_EDGES)) > 0
+        img_array[edges] = list(rgba_color[:3]) + [255]
 
     return Image.fromarray(img_array, "RGBA").convert("RGB")
-
-
-def pil_to_cv2(image: Image.Image) -> np.ndarray:
-    """Convertit une image PIL (RGB) en tableau NumPy OpenCV (BGR)."""
-    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
-
-def cv2_to_pil(image: np.ndarray) -> Image.Image:
-    """Convertit un tableau NumPy OpenCV (BGR) en image PIL (RGB)."""
-    return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
