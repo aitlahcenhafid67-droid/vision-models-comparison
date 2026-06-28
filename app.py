@@ -46,15 +46,20 @@ st.set_page_config(
 
 # Chemins importants
 PROJECT_ROOT = Path(__file__).parent
-MODELS_DIR   = PROJECT_ROOT / "models"
+
+# Sur Streamlit Cloud, /mount/src/ est en lecture seule → on utilise /tmp/
+_LOCAL_MODELS = PROJECT_ROOT / "models"
+_TMP_MODELS   = Path("/tmp/vision_models")
+MODELS_DIR    = _LOCAL_MODELS if (_LOCAL_MODELS / "yolo_finetuned" / "train" / "weights" / "best.pt").exists() \
+                else _TMP_MODELS
 
 # ── Repo HuggingFace contenant les modèles fine-tunés ───────────────────────
-HF_REPO = "aitlahcenhafid67/vision-models-ofppt"   # sera mis à jour après upload
+HF_REPO = "aitlahcenhafid/vision-models-ofppt"
 
 
-@st.cache_resource(show_spinner="Telechargement des modeles fine-tunes depuis HuggingFace...")
+@st.cache_resource(show_spinner="Telechargement des modeles fine-tunes (1ere fois ~2 min)...")
 def download_models_from_hub():
-    """Télécharge les modèles fine-tunés depuis HuggingFace si absents localement."""
+    """Télécharge les modèles depuis HuggingFace vers /tmp/ (Streamlit Cloud)."""
     try:
         import shutil
         from huggingface_hub import hf_hub_download
@@ -62,10 +67,10 @@ def download_models_from_hub():
         return False
 
     files = [
-        ("yolo/best.pt",                  MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt"),
-        ("vit/model.safetensors",         MODELS_DIR / "vit_finetuned"  / "model.safetensors"),
-        ("vit/config.json",               MODELS_DIR / "vit_finetuned"  / "config.json"),
-        ("sam/sam_decoder_finetuned.pth", MODELS_DIR / "sam_finetuned"  / "sam_decoder_finetuned.pth"),
+        ("yolo/best.pt",                  _TMP_MODELS / "yolo_finetuned" / "train" / "weights" / "best.pt"),
+        ("vit/model.safetensors",         _TMP_MODELS / "vit_finetuned"  / "model.safetensors"),
+        ("vit/config.json",               _TMP_MODELS / "vit_finetuned"  / "config.json"),
+        ("sam/sam_decoder_finetuned.pth", _TMP_MODELS / "sam_finetuned"  / "sam_decoder_finetuned.pth"),
     ]
 
     for hub_filename, local_path in files:
@@ -73,21 +78,23 @@ def download_models_from_hub():
             continue
         try:
             local_path.parent.mkdir(parents=True, exist_ok=True)
-            # hf_hub_download retourne le chemin réel du fichier téléchargé
             downloaded = hf_hub_download(
                 repo_id=HF_REPO,
                 filename=hub_filename,
                 local_dir_use_symlinks=False,
             )
             shutil.copy2(downloaded, local_path)
-        except Exception:
+        except Exception as e:
             pass
     return True
 
 
-# Télécharger automatiquement si les modèles fine-tunés sont absents (ex: Streamlit Cloud)
-if not (MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt").exists():
+# Télécharger si modèles absents localement (Streamlit Cloud)
+_yolo_pt = _TMP_MODELS / "yolo_finetuned" / "train" / "weights" / "best.pt"
+if not (_LOCAL_MODELS / "yolo_finetuned" / "train" / "weights" / "best.pt").exists() \
+   and not _yolo_pt.exists():
     download_models_from_hub()
+    MODELS_DIR = _TMP_MODELS
 
 
 # ════════════════════════════════════════════════════════════════════════════

@@ -20,7 +20,7 @@ CLASS_COLORS = {
 CLASS_NAMES = {0: "Bird", 1: "Cat", 2: "Dog"}
 
 
-def draw_yolo_boxes(image: Image.Image, boxes: list, scores: list, class_ids: list) -> Image.Image:
+def draw_yolo_boxes(image: Image.Image, boxes: list, scores: list, class_ids: list, class_names: dict | None = None) -> Image.Image:
     """
     Dessine les boîtes YOLO sur l'image.
 
@@ -38,8 +38,9 @@ def draw_yolo_boxes(image: Image.Image, boxes: list, scores: list, class_ids: li
 
     for box, score, cid in zip(boxes, scores, class_ids):
         x1, y1, x2, y2 = [int(c) for c in box]
-        color = CLASS_COLORS.get(cid, (255, 255, 0))
-        name = CLASS_NAMES.get(cid, f"Class {cid}")
+        names = class_names if class_names is not None else CLASS_NAMES
+        color = CLASS_COLORS.get(cid % 3, (255, 255, 0))
+        name = names.get(cid, f"Class {cid}")
 
         # Rectangle de la boîte (épaisseur 3)
         for thickness in range(3):
