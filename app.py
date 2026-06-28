@@ -48,6 +48,47 @@ st.set_page_config(
 PROJECT_ROOT = Path(__file__).parent
 MODELS_DIR   = PROJECT_ROOT / "models"
 
+# ── Repo HuggingFace contenant les modèles fine-tunés ───────────────────────
+HF_REPO = "aitlahcenhafid67/vision-models-ofppt"   # sera mis à jour après upload
+
+
+@st.cache_resource(show_spinner="Telechargement des modeles fine-tunes depuis HuggingFace...")
+def download_models_from_hub():
+    """Télécharge les modèles fine-tunés depuis HuggingFace si absents localement."""
+    try:
+        import shutil
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        return False
+
+    files = [
+        ("yolo/best.pt",                  MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt"),
+        ("vit/model.safetensors",         MODELS_DIR / "vit_finetuned"  / "model.safetensors"),
+        ("vit/config.json",               MODELS_DIR / "vit_finetuned"  / "config.json"),
+        ("sam/sam_decoder_finetuned.pth", MODELS_DIR / "sam_finetuned"  / "sam_decoder_finetuned.pth"),
+    ]
+
+    for hub_filename, local_path in files:
+        if local_path.exists():
+            continue
+        try:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            # hf_hub_download retourne le chemin réel du fichier téléchargé
+            downloaded = hf_hub_download(
+                repo_id=HF_REPO,
+                filename=hub_filename,
+                local_dir_use_symlinks=False,
+            )
+            shutil.copy2(downloaded, local_path)
+        except Exception:
+            pass
+    return True
+
+
+# Télécharger automatiquement si les modèles fine-tunés sont absents (ex: Streamlit Cloud)
+if not (MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt").exists():
+    download_models_from_hub()
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # FONCTIONS DE CHARGEMENT DES MODÈLES
@@ -73,14 +114,16 @@ def load_vit_model():
         from transformers import ViTForImageClassification, ViTImageProcessor
         save_dir = MODELS_DIR / "vit_finetuned"
         device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if save_dir.exists() and (save_dir / "config.json").exists():
+        weights_exist = (save_dir / "model.safetensors").exists() or (save_dir / "pytorch_model.bin").exists()
+        if save_dir.exists() and (save_dir / "config.json").exists() and weights_exist:
             model = ViTForImageClassification.from_pretrained(str(save_dir)).to(device)
+            status = "fine-tuné"
         else:
             model = ViTForImageClassification.from_pretrained(
                 "google/vit-base-patch16-224", num_labels=3, ignore_mismatched_sizes=True
             ).to(device)
+            status = "base (non fine-tuné)"
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
-        status = "fine-tuné" if (save_dir / "config.json").exists() else "base (non fine-tuné)"
         return model, processor, device, status
     except Exception as e:
         return None, None, None, f"non disponible ({type(e).__name__})"
@@ -126,23 +169,28 @@ def run_yolo_inference(image: Image.Image) -> dict:
     results = model(image, verbose=False)
     elapsed = time.time() - start
 
-    boxes, scores, class_ids = [], [], []
+    boxes, scores, class_ids, class_names_list = [], [], [], []
+    # model.names = {0: 'Bird', 1: 'Cat', 2: 'Dog'} ou les 80 classes COCO selon le modèle
+    model_names = model.names if hasattr(model, "names") else CLASS_NAMES
     if results and results[0].boxes is not None:
         for box in results[0].boxes:
             boxes.append(box.xyxy[0].cpu().tolist())
             scores.append(float(box.conf[0]))
-            class_ids.append(int(box.cls[0]))
+            cid = int(box.cls[0])
+            class_ids.append(cid)
+            class_names_list.append(model_names.get(cid, f"Class {cid}"))
 
-    result_image = draw_yolo_boxes(image, boxes, scores, class_ids)
+    result_image = draw_yolo_boxes(image, boxes, scores, class_ids, model_names)
 
     return {
-        "boxes"         : boxes,
-        "scores"        : scores,
-        "class_ids"     : class_ids,
-        "inference_time": elapsed,
-        "result_image"  : result_image,
-        "status"        : status,
-        "num_detections": len(boxes),
+        "boxes"           : boxes,
+        "scores"          : scores,
+        "class_ids"       : class_ids,
+        "class_names_list": class_names_list,
+        "inference_time"  : elapsed,
+        "result_image"    : result_image,
+        "status"          : status,
+        "num_detections"  : len(boxes),
     }
 
 
