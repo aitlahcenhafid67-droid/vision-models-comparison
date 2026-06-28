@@ -545,20 +545,32 @@ def _run_all_models(image: Image.Image):
 
 
 def _show_dataset_samples():
-    """Affiche quelques exemples du dataset si les images sont disponibles."""
-    test_dir = PROJECT_ROOT / "data" / "test" / "images"
-    if not test_dir.exists():
-        return
+    """Affiche quelques exemples du dataset (depuis assets/ ou data/)."""
+    # Priorité 1 : exemples committés dans le repo (disponibles sur Streamlit Cloud)
+    examples_dir = PROJECT_ROOT / "assets" / "examples"
+    if examples_dir.exists():
+        images = sorted(examples_dir.glob("*.jpg"))
+    else:
+        # Priorité 2 : images du dataset local
+        test_dir = PROJECT_ROOT / "data" / "test" / "images"
+        if not test_dir.exists():
+            return
+        images = sorted(test_dir.glob("*.jpg"))[:6]
 
-    images = list(test_dir.glob("*.jpg"))[:6]
     if not images:
         return
 
-    st.subheader("Exemples du dataset test")
+    st.subheader("Exemples du dataset — Birds · Cats · Dogs")
     cols = st.columns(3)
+    captions = {
+        "bird": "Oiseau (Bird)",
+        "cat" : "Chat (Cat)",
+        "dog" : "Chien (Dog)",
+    }
     for i, img_path in enumerate(images[:6]):
         with cols[i % 3]:
-            st.image(str(img_path), use_container_width=True, caption=img_path.name[:20])
+            label = captions.get(img_path.stem.split("_")[0], img_path.stem)
+            st.image(str(img_path), use_container_width=True, caption=label)
 
 
 # ════════════════════════════════════════════════════════════════════════════
