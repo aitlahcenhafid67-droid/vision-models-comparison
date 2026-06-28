@@ -56,65 +56,55 @@ MODELS_DIR   = PROJECT_ROOT / "models"
 
 @st.cache_resource(show_spinner="Chargement de YOLOv8...")
 def load_yolo_model():
-    """
-    Charge le modèle YOLOv8 fine-tuné.
-    @st.cache_resource garde le modèle en mémoire entre les requêtes.
-    """
-    from ultralytics import YOLO
-
-    best_pt = MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt"
-
-    if best_pt.exists():
-        model = YOLO(str(best_pt))
-        return model, "fine-tuné", str(best_pt)
-    else:
-        # Fallback : modèle de base (pas fine-tuné)
-        model = YOLO("yolov8n.pt")
-        return model, "base (non fine-tuné)", "yolov8n.pt"
+    try:
+        from ultralytics import YOLO
+        best_pt = MODELS_DIR / "yolo_finetuned" / "train" / "weights" / "best.pt"
+        if best_pt.exists():
+            return YOLO(str(best_pt)), "fine-tuné", str(best_pt)
+        else:
+            return YOLO("yolov8n.pt"), "base (non fine-tuné)", "yolov8n.pt"
+    except Exception as e:
+        return None, f"non disponible ({type(e).__name__})", ""
 
 
 @st.cache_resource(show_spinner="Chargement de ViT...")
 def load_vit_model():
-    """Charge le modèle ViT fine-tuné."""
-    from transformers import ViTForImageClassification, ViTImageProcessor
-
-    save_dir = MODELS_DIR / "vit_finetuned"
-    device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if save_dir.exists() and (save_dir / "config.json").exists():
-        model     = ViTForImageClassification.from_pretrained(str(save_dir)).to(device)
+    try:
+        from transformers import ViTForImageClassification, ViTImageProcessor
+        save_dir = MODELS_DIR / "vit_finetuned"
+        device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if save_dir.exists() and (save_dir / "config.json").exists():
+            model = ViTForImageClassification.from_pretrained(str(save_dir)).to(device)
+        else:
+            model = ViTForImageClassification.from_pretrained(
+                "google/vit-base-patch16-224", num_labels=3, ignore_mismatched_sizes=True
+            ).to(device)
         processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
-        return model, processor, device, "fine-tuné"
-    else:
-        # Fallback : modèle de base
-        model     = ViTForImageClassification.from_pretrained(
-            "google/vit-base-patch16-224", num_labels=3, ignore_mismatched_sizes=True
-        ).to(device)
-        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224")
-        return model, processor, device, "base (non fine-tuné)"
+        status = "fine-tuné" if (save_dir / "config.json").exists() else "base (non fine-tuné)"
+        return model, processor, device, status
+    except Exception as e:
+        return None, None, None, f"non disponible ({type(e).__name__})"
 
 
 @st.cache_resource(show_spinner="Chargement de SAM...")
 def load_sam_model():
-    """Charge SAM avec le décodeur fine-tuné si disponible."""
-    from transformers import SamModel, SamProcessor
-
-    save_dir     = MODELS_DIR / "sam_finetuned"
-    decoder_path = save_dir / "sam_decoder_finetuned.pth"
-    device       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
-    model     = SamModel.from_pretrained("facebook/sam-vit-base").to(device)
-
-    if decoder_path.exists():
-        state_dict = torch.load(str(decoder_path), map_location=device)
-        model.mask_decoder.load_state_dict(state_dict)
-        status = "fine-tuné"
-    else:
-        status = "base (non fine-tuné)"
-
-    model.eval()
-    return model, processor, device, status
+    try:
+        from transformers import SamModel, SamProcessor
+        save_dir     = MODELS_DIR / "sam_finetuned"
+        decoder_path = save_dir / "sam_decoder_finetuned.pth"
+        device       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        processor = SamProcessor.from_pretrained("facebook/sam-vit-base")
+        model     = SamModel.from_pretrained("facebook/sam-vit-base").to(device)
+        if decoder_path.exists():
+            state_dict = torch.load(str(decoder_path), map_location=device)
+            model.mask_decoder.load_state_dict(state_dict)
+            status = "fine-tuné"
+        else:
+            status = "base (non fine-tuné)"
+        model.eval()
+        return model, processor, device, status
+    except Exception as e:
+        return None, None, None, f"non disponible ({type(e).__name__})"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -129,20 +119,20 @@ def run_yolo_inference(image: Image.Image) -> dict:
         dict avec boxes, scores, class_ids, inference_time, result_image
     """
     model, status, _ = load_yolo_model()
+    if model is None:
+        raise RuntimeError(f"YOLOv8 {status}")
 
     start = time.time()
     results = model(image, verbose=False)
     elapsed = time.time() - start
 
-    # Extraire les résultats
     boxes, scores, class_ids = [], [], []
     if results and results[0].boxes is not None:
         for box in results[0].boxes:
-            boxes.append(box.xyxy[0].cpu().tolist())   # [x1, y1, x2, y2]
+            boxes.append(box.xyxy[0].cpu().tolist())
             scores.append(float(box.conf[0]))
             class_ids.append(int(box.cls[0]))
 
-    # Dessiner les boîtes sur l'image
     result_image = draw_yolo_boxes(image, boxes, scores, class_ids)
 
     return {
@@ -164,8 +154,9 @@ def run_vit_inference(image: Image.Image) -> dict:
         dict avec class_name, confidence, all_probs, inference_time
     """
     model, processor, device, status = load_vit_model()
+    if model is None:
+        raise RuntimeError(f"ViT {status}")
 
-    # Prétraiter l'image pour ViT
     inputs = processor(images=image, return_tensors="pt").to(device)
 
     start = time.time()
@@ -208,6 +199,8 @@ def run_sam_inference(image: Image.Image, input_box: list | None = None) -> dict
         dict avec masks, iou_scores, inference_time, result_image
     """
     model, processor, device, status = load_sam_model()
+    if model is None:
+        raise RuntimeError(f"SAM {status}")
 
     W, H = image.size
 
@@ -344,8 +337,13 @@ def tab_inference():
 
 
 def _show_yolo_result(image: Image.Image):
-    with st.spinner("Détection YOLO en cours..."):
-        result = run_yolo_inference(image)
+    try:
+        with st.spinner("Détection YOLO en cours..."):
+            result = run_yolo_inference(image)
+    except Exception as e:
+        st.error(f"YOLOv8 non disponible sur ce déploiement : {e}")
+        st.info("Raison probable : incompatibilité OpenCV / Python 3.14 sur Streamlit Cloud. Lancez l'app en local pour tester YOLO.")
+        return
 
     col1, col2 = st.columns(2)
     with col1:
@@ -378,8 +376,12 @@ def _show_yolo_result(image: Image.Image):
 
 
 def _show_vit_result(image: Image.Image):
-    with st.spinner("Classification ViT en cours..."):
-        result = run_vit_inference(image)
+    try:
+        with st.spinner("Classification ViT en cours..."):
+            result = run_vit_inference(image)
+    except Exception as e:
+        st.error(f"ViT non disponible : {e}")
+        return
 
     col1, col2 = st.columns(2)
     with col1:
@@ -406,8 +408,12 @@ def _show_vit_result(image: Image.Image):
 
 
 def _show_sam_result(image: Image.Image, input_box=None):
-    with st.spinner("Segmentation SAM en cours..."):
-        result = run_sam_inference(image, input_box)
+    try:
+        with st.spinner("Segmentation SAM en cours..."):
+            result = run_sam_inference(image, input_box)
+    except Exception as e:
+        st.error(f"SAM non disponible : {e}")
+        return
 
     col1, col2 = st.columns(2)
     with col1:
