@@ -1,0 +1,31 @@
+# ============================================================
+# DÉPENDANCES DU PROJET - Vision Comparison (YOLO + ViT + SAM)
+# ============================================================
+# Installation: pip install -r requirements.txt
+
+# --- Deep Learning Framework ---
+torch>=2.0.0
+torchvision>=0.15.0
+
+# --- Modèles ---
+ultralytics>=8.0.0          # YOLOv8
+transformers>=4.35.0         # ViT + SAM (HuggingFace)
+accelerate>=0.24.0           # Accélère l'entraînement HuggingFace
+
+# --- Interface Web ---
+streamlit>=1.28.0
+
+# --- Traitement d'images ---
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# --- Données & Visualisation ---
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+plotly>=5.17.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+
+# --- Utilitaires ---
+PyYAML>=6.0
