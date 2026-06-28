@@ -4,6 +4,10 @@ Application Streamlit de fine-tuning et comparaison de 3 modèles de vision par 
 
 **OFPPT — TS DIA-IA-102**
 
+**Application déployée :** https://vision-models-comparison-abdelahfid-ait-lahcen.streamlit.app  
+**Modèles fine-tunés :** https://huggingface.co/aitlahcenhafid/vision-models-ofppt  
+**Code source :** https://github.com/aitlahcenhafid67-droid/vision-models-comparison
+
 ---
 
 ## Résultats obtenus
@@ -93,12 +97,30 @@ Ouvrir **http://localhost:8501**
 
 ---
 
+## Architecture de déploiement
+
+```
+GitHub (code)          HuggingFace Hub (modèles)     Streamlit Cloud (app)
+──────────────         ─────────────────────────     ─────────────────────
+app.py           +     yolo/best.pt (6 MB)      ───► App accessible en ligne
+src/             +     vit/model.safetensors          télécharge les modèles
+requirements.txt +     (327 MB)                       au premier démarrage
+README.md              sam/sam_decoder.pth
+                        (15.5 MB)
+```
+
+Les modèles fine-tunés sont hébergés sur HuggingFace Hub car trop lourds pour GitHub (limite 100 MB).  
+L'application les télécharge automatiquement au premier démarrage.
+
+---
+
 ## Technologies
 
 - **Python 3.10+**
 - **PyTorch** — framework deep learning
 - **Ultralytics** — YOLOv8
 - **HuggingFace Transformers** — ViT et SAM
+- **HuggingFace Hub** — hébergement des modèles fine-tunés
 - **Streamlit** — interface web
 - **Plotly** — graphiques interactifs
 
