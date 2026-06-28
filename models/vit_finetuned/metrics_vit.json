@@ -1,0 +1,15 @@
+{
+  "model": "ViT-Base-Patch16-224 (head-only)",
+  "task": "classification",
+  "strategy": "frozen encoder + trained head",
+  "precision": 0.9541,
+  "recall": 0.9655,
+  "f1": 0.9593,
+  "accuracy": 0.9674,
+  "training_time_seconds": 61019.6,
+  "training_time_minutes": 1017.0,
+  "model_size_mb": 327.33,
+  "epochs_trained": 10,
+  "best_val_acc": 0.9442,
+  "train_samples": 800
+}

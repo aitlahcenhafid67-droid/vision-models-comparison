@@ -1,8 +1,17 @@
 # Données (trop lourdes pour GitHub - télécharger séparément)
 data/
 
-# Modèles fine-tunés (trop lourds - ViT 327MB, etc.)
-models/
+# Modèles fine-tunés (poids lourds exclus)
+models/**/*.pt
+models/**/*.pth
+models/**/*.safetensors
+
+# Autoriser les métriques et courbes (petits fichiers)
+!models/**/metrics_*.json
+!models/**/training_curves_*.png
+!models/**/training_history.json
+!models/**/results.png
+!models/**/config.json
 
 # Logs d'entraînement
 logs/
