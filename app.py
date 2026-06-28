@@ -53,6 +53,9 @@ _TMP_MODELS   = Path("/tmp/vision_models")
 MODELS_DIR    = _LOCAL_MODELS if (_LOCAL_MODELS / "yolo_finetuned" / "train" / "weights" / "best.pt").exists() \
                 else _TMP_MODELS
 
+# Les métriques JSON sont toujours dans le repo git (committées)
+METRICS_DIR = _LOCAL_MODELS
+
 # ── Repo HuggingFace contenant les modèles fine-tunés ───────────────────────
 HF_REPO = "aitlahcenhafid/vision-models-ofppt"
 
@@ -326,9 +329,9 @@ def show_sidebar():
                              ("vit",  "ViT (classification)"),
                              ("sam",  "SAM (segmentation)")]:
             metrics_file = {
-                "yolo": MODELS_DIR / "yolo_finetuned" / "metrics_yolo.json",
-                "vit":  MODELS_DIR / "vit_finetuned"  / "metrics_vit.json",
-                "sam":  MODELS_DIR / "sam_finetuned"  / "metrics_sam.json",
+                "yolo": METRICS_DIR / "yolo_finetuned" / "metrics_yolo.json",
+                "vit":  METRICS_DIR / "vit_finetuned"  / "metrics_vit.json",
+                "sam":  METRICS_DIR / "sam_finetuned"  / "metrics_sam.json",
             }[name]
 
             if metrics_file.exists():
@@ -566,7 +569,7 @@ def tab_comparison():
     """Onglet de comparaison des métriques entre les modèles."""
     st.header("Comparaison des Modèles")
 
-    comparison = build_comparison_table(MODELS_DIR)
+    comparison = build_comparison_table(METRICS_DIR)
 
     if not comparison:
         st.warning(
@@ -697,9 +700,9 @@ def _plot_model_size_latency(comparison: dict):
 def _show_training_curves():
     """Affiche les courbes d'apprentissage sauvegardées."""
     curve_paths = {
-        "YOLO" : MODELS_DIR / "yolo_finetuned" / "train" / "results.png",
-        "ViT"  : MODELS_DIR / "vit_finetuned"  / "training_curves_vit.png",
-        "SAM"  : MODELS_DIR / "sam_finetuned"  / "training_curves_sam.png",
+        "YOLO" : METRICS_DIR / "yolo_finetuned" / "train" / "results.png",
+        "ViT"  : METRICS_DIR / "vit_finetuned"  / "training_curves_vit.png",
+        "SAM"  : METRICS_DIR / "sam_finetuned"  / "training_curves_sam.png",
     }
 
     available = {k: v for k, v in curve_paths.items() if v.exists()}
